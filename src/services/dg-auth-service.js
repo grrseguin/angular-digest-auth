@@ -85,16 +85,23 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
          */
         this.isAuthorized = function()
         {
-            var deferred = $q.defer();
-
-            authRequests.getPromise().then(function()
-                {
-                    deferred.resolve(authIdentity.has());
-                },
-                function()
-                {
-                    deferred.reject(authIdentity.has())
-                });
+            var
+                deferred = $q.defer(),
+                authPromise = authRequests.getPromise();
+                
+            if( authPromise === null ){
+                deferred.reject( false );
+            }
+            else{
+                authRequests.getPromise().then(function()
+                    {
+                        deferred.resolve(authIdentity.has());
+                    },
+                    function()
+                    {
+                        deferred.reject(authIdentity.has())
+                    });
+            }
 
             return deferred.promise;
         };

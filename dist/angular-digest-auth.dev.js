@@ -1,6 +1,6 @@
 /**
  * AngularJS module to manage HTTP Digest Authentication
- * @version v0.4.3 - 2014-02-02
+ * @version v0.4.3 - 2016-03-14
  * @link https://github.com/tafax/angular-digest-auth
  * @author Matteo Tafani Alunno <matteo.tafanialunno@gmail.com>
  * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -39,8 +39,10 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                     var login = authService.getCredentials();
                     var header = authClient.processRequest(login.username, login.password, request.method, request.url);
 
-                    if(header)
+                    if(header){
                         request.headers['Authorization'] = header;
+                        authClient.AuthRequested = true;
+                    }
 
                     return (request || $q.when(request));
                 },
@@ -66,6 +68,7 @@ dgAuth.config(['$httpProvider', function($httpProvider)
             };
         }]);
 }]);
+
 
 // Source: src/config/config-state-machine.js
 
@@ -106,6 +109,7 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                 {
                     var credentials = params.credentials;
                     authService.setCredentials(credentials.username, credentials.password);
+                    delete params.credentials;
                 }
             }]
         },
@@ -113,6 +117,15 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
             transitions: {
                 //Checks if the credentials are present(loginError) or not(waitingCredentials)
                 401: [
+                  //Case Auto authentication
+                {
+                    to: 'loginRequest',
+                    predicate: ['authService', 'authRequests', 'authClient', function(authService, authRequests, authClient)
+                    {
+                        return (authService.hasCredentials() && authRequests.getValid() && !authClient.AuthRequested);
+                    }]
+                },
+                //case without user credentials
                 {
                     to: 'waitingCredentials',
                     predicate: ['authService', 'authRequests', function(authService, authRequests)
@@ -120,13 +133,15 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                         return (!authService.hasCredentials() && authRequests.getValid());
                     }]
                 },
+                //case bad user credentials
                 {
                     to: 'loginError',
-                    predicate: ['authService', 'authRequests', function(authService, authRequests)
+                    predicate: ['authService', 'authRequests', 'authClient', function(authService, authRequests, authClient)
                     {
-                        return (authService.hasCredentials() && authRequests.getValid());
+                        return (authService.hasCredentials() && authRequests.getValid() && authClient.AuthRequested);
                     }]
                 },
+                //case limit reached
                 {
                     to: 'failureLogin',
                     predicate: ['authRequests', function(authRequests)
@@ -134,7 +149,8 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                         return !authRequests.getValid();
                     }]
                 }],
-                201: 'loggedIn'
+                201: 'loggedIn',
+                failure: 'loginError'
             },
             //Does the request to the server and save the promise
             action: ['authRequests', function(authRequests)
@@ -177,6 +193,7 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                     authService.clearRequest();
                     authService.clearCredentials();
                     authStorage.clearCredentials();
+                    delete params.credentials;
 
                     var callbacksLogout = authService.getCallbacks('logout.successful');
                     for(var i in callbacksLogout)
@@ -213,6 +230,11 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
             {
                 if(name == 'logoutRequest')
                 {
+                    authIdentity.clear();
+                    authService.clearRequest();
+                    authService.clearCredentials();
+                    authStorage.clearCredentials();
+                    delete params.credentials;
                     var callbacksLogout = authService.getCallbacks('logout.error');
                     for(var i in callbacksLogout)
                     {
@@ -274,6 +296,7 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
         }
     });
 }]);
+
 
 // Source: src/services/dg-auth-service.js
 
@@ -362,16 +385,23 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
          */
         this.isAuthorized = function()
         {
-            var deferred = $q.defer();
-
-            authRequests.getPromise().then(function()
-                {
-                    deferred.resolve(authIdentity.has());
-                },
-                function()
-                {
-                    deferred.reject(authIdentity.has())
-                });
+            var
+                deferred = $q.defer(),
+                authPromise = authRequests.getPromise();
+                
+            if( authPromise === null ){
+                deferred.reject( false );
+            }
+            else{
+                authRequests.getPromise().then(function()
+                    {
+                        deferred.resolve(authIdentity.has());
+                    },
+                    function()
+                    {
+                        deferred.reject(authIdentity.has())
+                    });
+            }
 
             return deferred.promise;
         };
@@ -517,6 +547,7 @@ dgAuth.provider('dgAuthService', function DgAuthServiceProvider()
     }];
 });
 
+
 // Source: src/services/auth-client.js
 
 /**
@@ -645,6 +676,12 @@ function(authServer, md5)
         {
             return authServer.isConfigured();
         };
+
+        /**
+         * True if the authorization tag has been sent in the request header, otherwise false
+         * @type {Boolean}
+         */
+        this.AuthRequested = false;
 
         /**
          * Process a request and add the authorization header
@@ -1125,42 +1162,6 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
             return (_times <= limit);
         };
 
-        var request = function()
-        {
-            var promise = null;
-
-            if(authService.hasRequest())
-            {
-                var request = authService.getRequest();
-                promise = $http(request.config).then(function(response)
-                    {
-                        request.deferred.resolve(response);
-
-                        if(_times > 0)
-                            _times = 0;
-
-                        if(stateMachine.isAvailable('201'))
-                            stateMachine.send('201', {response: response});
-
-                        return response;
-                    },
-                    function(response)
-                    {
-                        request.deferred.reject(response);
-
-                        if(_times > 0)
-                            _times = 0;
-
-                        if(stateMachine.isAvailable('failure'))
-                            stateMachine.send('failure', {response: response});
-
-                        return response;
-                    });
-            }
-
-            return promise;
-        };
-
         /**
          *
          * @returns {promise}
@@ -1168,10 +1169,6 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
         this.signin = function()
         {
             _times++;
-
-            _promise = request();
-            if(_promise)
-                return _promise;
 
             _promise = $http(config.login).then(function(response)
                 {
@@ -1197,9 +1194,6 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
          */
         this.signout = function()
         {
-            _promise = request();
-            if(_promise)
-                return _promise;
 
             _promise = $http(config.logout).then(function(response)
                 {
@@ -1209,6 +1203,8 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
                 },
                 function(response)
                 {
+                    stateMachine.send('401', {response: response});
+                    
                     return response;
                 });
             return _promise;
@@ -1220,6 +1216,7 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
         return new AuthRequest(dgAuthServiceProvider.getLimit(), dgAuthServiceProvider.getConfig(), $http, authService, stateMachine);
     }];
 }]);
+
 
 // Source: src/services/auth-storage.js
 

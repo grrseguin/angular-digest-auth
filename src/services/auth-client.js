@@ -126,6 +126,12 @@ function(authServer, md5)
         };
 
         /**
+         * True if the authorization tag has been sent in the request header, otherwise false
+         * @type {Boolean}
+         */
+        this.AuthRequested = false;
+
+        /**
          * Process a request and add the authorization header
          * if the request need an authentication.
          *

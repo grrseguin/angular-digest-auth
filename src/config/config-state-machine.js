@@ -44,6 +44,15 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
             transitions: {
                 //Checks if the credentials are present(loginError) or not(waitingCredentials)
                 401: [
+                  //Case Auto authentication
+                {
+                    to: 'loginRequest',
+                    predicate: ['authService', 'authRequests', 'authClient', function(authService, authRequests, authClient)
+                    {
+                        return (authService.hasCredentials() && authRequests.getValid() && !authClient.AuthRequested);
+                    }]
+                },
+                //case without user credentials
                 {
                     to: 'waitingCredentials',
                     predicate: ['authService', 'authRequests', function(authService, authRequests)
@@ -51,13 +60,15 @@ dgAuth.config(['stateMachineProvider', function(stateMachineProvider)
                         return (!authService.hasCredentials() && authRequests.getValid());
                     }]
                 },
+                //case bad user credentials
                 {
                     to: 'loginError',
-                    predicate: ['authService', 'authRequests', function(authService, authRequests)
+                    predicate: ['authService', 'authRequests', 'authClient', function(authService, authRequests, authClient)
                     {
-                        return (authService.hasCredentials() && authRequests.getValid());
+                        return (authService.hasCredentials() && authRequests.getValid() && authClient.AuthRequested);
                     }]
                 },
+                //case limit reached
                 {
                     to: 'failureLogin',
                     predicate: ['authRequests', function(authRequests)

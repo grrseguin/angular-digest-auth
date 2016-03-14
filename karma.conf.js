@@ -18,7 +18,10 @@ module.exports = function(config) {
       'lib/angular-mocks/angular-mocks.js',
       'lib/angular-md5/angular-md5.js',
       'lib/angular-state-machine/src/angular-state-machine.js',
+      'lib/angular-state-machine/src/services/machine-configuration.js',
       'lib/angular-state-machine/src/services/state-machine.js',
+      'lib/angular-state-machine/src/strategies/machine-strategy.js',
+      'lib/angular-state-machine/src/strategies/sync-strategy.js',
       'src/angular-digest-auth.js',
       'src/config/config-module.js',
       'src/config/config-state-machine.js',
@@ -35,7 +38,7 @@ module.exports = function(config) {
 
     // list of files to exclude
     exclude: [
-      
+
     ],
 
 

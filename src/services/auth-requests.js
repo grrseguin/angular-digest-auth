@@ -47,11 +47,6 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
         {
             _times++;
 
-            //@todo: Trigerring the same request two times, Why it's necessary ?
-            // _promise = request();
-            // if(_promise)
-            //     return _promise;
-
             _promise = $http(config.login).then(function(response)
                 {
                     _times = 0;
@@ -76,10 +71,6 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
          */
         this.signout = function()
         {
-            //@todo: Trigerring the same request two times, Why it's necessary ?
-            // _promise = request();
-            // if(_promise)
-            //     return _promise;
 
             _promise = $http(config.logout).then(function(response)
                 {

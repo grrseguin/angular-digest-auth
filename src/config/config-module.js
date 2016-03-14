@@ -19,8 +19,10 @@ dgAuth.config(['$httpProvider', function($httpProvider)
                     var login = authService.getCredentials();
                     var header = authClient.processRequest(login.username, login.password, request.method, request.url);
 
-                    if(header)
+                    if(header){
                         request.headers['Authorization'] = header;
+                        authClient.AuthRequested = true;
+                    }
 
                     return (request || $q.when(request));
                 },

@@ -39,42 +39,6 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
             return (_times <= limit);
         };
 
-        var request = function()
-        {
-            var promise = null;
-
-            if(authService.hasRequest())
-            {
-                var request = authService.getRequest();
-                promise = $http(request.config).then(function(response)
-                    {
-                        request.deferred.resolve(response);
-
-                        if(_times > 0)
-                            _times = 0;
-
-                        if(stateMachine.isAvailable('201'))
-                            stateMachine.send('201', {response: response});
-
-                        return response;
-                    },
-                    function(response)
-                    {
-                        request.deferred.reject(response);
-
-                        if(_times > 0)
-                            _times = 0;
-
-                        if(stateMachine.isAvailable('failure'))
-                            stateMachine.send('failure', {response: response});
-
-                        return response;
-                    });
-            }
-
-            return promise;
-        };
-
         /**
          *
          * @returns {promise}
@@ -83,9 +47,10 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
         {
             _times++;
 
-            _promise = request();
-            if(_promise)
-                return _promise;
+            //@todo: Trigerring the same request two times, Why it's necessary ?
+            // _promise = request();
+            // if(_promise)
+            //     return _promise;
 
             _promise = $http(config.login).then(function(response)
                 {
@@ -111,9 +76,10 @@ dgAuth.provider('authRequests', ['dgAuthServiceProvider', function AuthRequestsP
          */
         this.signout = function()
         {
-            _promise = request();
-            if(_promise)
-                return _promise;
+            //@todo: Trigerring the same request two times, Why it's necessary ?
+            // _promise = request();
+            // if(_promise)
+            //     return _promise;
 
             _promise = $http(config.logout).then(function(response)
                 {
